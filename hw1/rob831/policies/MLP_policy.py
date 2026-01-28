@@ -80,8 +80,22 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         else:
             observation = obs[None]
 
-        # TODO return the action that the policy prescribes
-        raise NotImplementedError
+        observation = ptu.from_numpy(observation)
+
+        # return the action that the policy prescribes
+        if self.discrete:
+            logits = self.logits_na(observation)
+            action_distribution = distributions.Categorical(logits=logits)
+            action = action_distribution.sample()
+        else:
+            mean = self.mean_net(observation)
+            std = torch.exp(self.logstd)
+            action_distribution = distributions.normal.Normal(mean, std)
+            action = action_distribution.sample()
+
+        action = ptu.to_numpy(action)
+
+        return action
 
     # update/train this policy
     def update(self, observations, actions, **kwargs):
@@ -93,7 +107,14 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
     # return more flexible objects, such as a
     # `torch.distributions.Distribution` object. It's up to you!
     def forward(self, observation: torch.FloatTensor) -> Any:
-        raise NotImplementedError
+        if self.discrete:
+            logits = self.logits_na(observation)
+            action_distribution = distributions.Categorical(logits=logits)
+        else:
+            mean = self.mean_net(observation)
+            std = torch.exp(self.logstd)
+            action_distribution = distributions.normal.Normal(mean, std)
+        return action_distribution
 
 
 #####################################################
@@ -108,8 +129,18 @@ class MLPPolicySL(MLPPolicy):
             self, observations, actions,
             adv_n=None, acs_labels_na=None, qvals=None
     ):
-        # TODO: update the policy and return the loss
-        loss = TODO
+        # update the policy and return the loss
+        action_distribution = self.forward(observations)
+        if self.discrete:
+            probs = action_distribution.probs
+            loss = self.loss(probs, actions)
+        else:
+            sampled_actions = action_distribution.rsample()
+            loss = self.loss(sampled_actions, actions)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
         return {
             # You can add extra logging information here, but keep this line

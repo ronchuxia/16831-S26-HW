@@ -1,6 +1,7 @@
 from rob831.infrastructure.replay_buffer import ReplayBuffer
 from rob831.policies.MLP_policy import MLPPolicySL
 from .base_agent import BaseAgent
+import torch
 
 
 class BCAgent(BaseAgent):
