@@ -154,7 +154,10 @@ class MLPPolicyPG(MLPPolicy):
             # 'zero_grad' first
 
         action_distribution = self.forward(observations)
-        policy_loss = - torch.mean(action_distribution.log_prob(actions) * advantages)
+        log_probs = action_distribution.log_prob(actions)
+        if not self.discrete:
+            log_probs = log_probs.sum(axis=-1)
+        policy_loss = - torch.mean(log_probs * advantages)
 
         self.optimizer.zero_grad()
         policy_loss.backward()
@@ -176,7 +179,7 @@ class MLPPolicyPG(MLPPolicy):
             q_values = (q_values - q_values_mean) / (q_values_std + 1e-5)
             q_values = ptu.from_numpy(q_values)
 
-            values_normalized = self.run_baseline_prediction(observations)
+            values_normalized = self.baseline(observations).squeeze()
 
             baseline_loss = self.baseline_loss(values_normalized, q_values)
 

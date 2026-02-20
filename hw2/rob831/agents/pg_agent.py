@@ -84,7 +84,7 @@ class PGAgent(BaseAgent):
         # Case 2: reward-to-go PG
         # Estimate Q^{pi}(s_t, a_t) by the discounted sum of rewards starting from t
         else:
-            q_values = np.concatenate([self._discounted_return(rewards) for rewards in rewards_list])
+            q_values = np.concatenate([self._discounted_cumsum(rewards) for rewards in rewards_list])
 
         return q_values  # return an array
 
@@ -98,7 +98,7 @@ class PGAgent(BaseAgent):
         # by querying the neural network that you're using to learn the value function
         if self.nn_baseline:
 
-            values_normalized = self.actor._prediction(obs)
+            values_normalized = self.actor.run_baseline_prediction(obs)
             ## ensure that the value predictions and q_values have the same dimensionality
             ## to prevent silent broadcasting errors
             assert values_normalized.ndim == q_values.ndim
@@ -133,15 +133,14 @@ class PGAgent(BaseAgent):
                     # estimate lambda returns
                     advantages[i] = rewards[i] + self.gamma * ((1 - self.gae_lambda) * values[i+1] + self.gae_lambda * advantages[i+1]) if not terminals[i] else rewards[i]
 
-                # remove dummy advantage
-                advantages = advantages[:-1]
-
                 # subtract value function to get advantage
                 advantages -= values
 
+                # remove dummy advantage
+                advantages = advantages[:-1]
+
             else:
                 ## compute advantage estimates using q_values, and values as baselines
-                # raise NotImplementedError
                 advantages = q_values - values
 
         # Else, just set the advantage to [Q]

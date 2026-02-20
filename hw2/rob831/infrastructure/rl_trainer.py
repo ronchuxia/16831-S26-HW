@@ -154,7 +154,7 @@ class RL_Trainer(object):
     ####################################
 
     def collect_training_trajectories(self, itr, load_initial_expertdata, collect_policy, batch_size):
-        if itr == 0:
+        if itr == 0 and load_initial_expertdata:
             with open(load_initial_expertdata, 'rb') as file:
                 loaded_paths = pickle.load(file)
             return loaded_paths, 0, None
@@ -176,12 +176,6 @@ class RL_Trainer(object):
         for train_step in range(self.params['num_agent_train_steps_per_iter']):
             # sample some data from the data buffer
             ob_batch, ac_batch, re_batch, next_ob_batch, terminal_batch = self.agent.sample(self.params['train_batch_size'])
-
-            ob_batch = ptu.from_numpy(ob_batch)
-            ac_batch = ptu.from_numpy(ac_batch)
-            re_batch = ptu.from_numpy(re_batch)
-            next_ob_batch = ptu.from_numpy(next_ob_batch)
-            terminal_batch = ptu.from_numpy(terminal_batch)
 
             # use the sampled data to train an agent
             train_log = self.agent.train(ob_batch, ac_batch, re_batch, next_ob_batch, terminal_batch)
