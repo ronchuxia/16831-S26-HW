@@ -78,17 +78,17 @@ class FFModel(nn.Module, BaseModel):
                 unnormalized) output of the delta network. This is needed
         """
         # normalize input data to mean 0, std 1
-        obs_normalized = # TODO(Q1)
-        acs_normalized = # TODO(Q1)
+        obs_normalized = normalize(obs_unnormalized, obs_mean, obs_std)
+        acs_normalized = normalize(acs_unnormalized, acs_mean, acs_std)
 
         # predicted change in obs
         concatenated_input = torch.cat([obs_normalized, acs_normalized], dim=1)
 
-        # TODO(Q1) compute delta_pred_normalized and next_obs_pred
+        # (Q1) compute delta_pred_normalized and next_obs_pred
         # Hint: as described in the PDF, the output of the network is the
         # *normalized change* in state, i.e. normalized(s_t+1 - s_t).
-        delta_pred_normalized = # TODO(Q1)
-        next_obs_pred = # TODO(Q1)
+        delta_pred_normalized = self.delta_network(concatenated_input)
+        next_obs_pred = obs_unnormalized + unnormalize(delta_pred_normalized, delta_mean, delta_std)
         return next_obs_pred, delta_pred_normalized
 
     def get_prediction(self, obs, acs, data_statistics):
@@ -105,9 +105,29 @@ class FFModel(nn.Module, BaseModel):
              - 'delta_std'
         :return: a numpy array of the predicted next-states (s_t+1)
         """
-        prediction = # TODO(Q1) get the predicted next-states (s_t+1) as a numpy array
+        # (Q1) get the predicted next-states (s_t+1) as a numpy array
         # Hint: `self(...)` returns a tuple, but you only need to use one of the
         # outputs.
+        obs = ptu.from_numpy(obs)
+        acs = ptu.from_numpy(acs)
+        obs_mean = ptu.from_numpy(data_statistics['obs_mean'])
+        obs_std = ptu.from_numpy(data_statistics['obs_std'])
+        acs_mean = ptu.from_numpy(data_statistics['acs_mean'])
+        acs_std = ptu.from_numpy(data_statistics['acs_std'])
+        delta_mean = ptu.from_numpy(data_statistics['delta_mean'])
+        delta_std = ptu.from_numpy(data_statistics['delta_std'])
+        
+        prediction, _ = self.forward(
+            obs_unnormalized=obs,
+            acs_unnormalized=acs,
+            obs_mean=obs_mean,
+            obs_std=obs_std,
+            acs_mean=acs_mean,
+            acs_std=acs_std,
+            delta_mean=delta_mean,
+            delta_std=delta_std
+        )
+        prediction = ptu.to_numpy(prediction)
         return prediction
 
     def update(self, observations, actions, next_observations, data_statistics):
@@ -125,14 +145,37 @@ class FFModel(nn.Module, BaseModel):
              - 'delta_std'
         :return:
         """
-        target = # TODO(Q1) compute the normalized target for the model.
+        # (Q1) compute the normalized target for the model.
         # Hint: you should use `data_statistics['delta_mean']` and
         # `data_statistics['delta_std']`, which keep track of the mean
         # and standard deviation of the model.
+        delta = next_observations - observations
+        target = normalize(delta, data_statistics['delta_mean'], data_statistics['delta_std'])
+        target = ptu.from_numpy(target)
 
-        loss = # TODO(Q1) compute the loss
+        # (Q1) compute the loss
         # Hint: `self(...)` returns a tuple, but you only need to use one of the
         # outputs.
+        observations = ptu.from_numpy(observations)
+        actions = ptu.from_numpy(actions)
+        obs_mean = ptu.from_numpy(data_statistics['obs_mean'])
+        obs_std = ptu.from_numpy(data_statistics['obs_std'])
+        acs_mean = ptu.from_numpy(data_statistics['acs_mean'])
+        acs_std = ptu.from_numpy(data_statistics['acs_std'])
+        delta_mean = ptu.from_numpy(data_statistics['delta_mean'])
+        delta_std = ptu.from_numpy(data_statistics['delta_std'])
+
+        _, delta_pred_normalized = self.forward(
+            obs_unnormalized=observations,
+            acs_unnormalized=actions,
+            obs_mean=obs_mean,
+            obs_std=obs_std,
+            acs_mean=acs_mean,
+            acs_std=acs_std,
+            delta_mean=delta_mean,
+            delta_std=delta_std
+        )
+        loss = self.loss(delta_pred_normalized, target)
 
         self.optimizer.zero_grad()
         loss.backward()
